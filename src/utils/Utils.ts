@@ -29,6 +29,55 @@ export function replaceTags(template: string, mediaTypeModel: MediaTypeModel, ig
 	return template.replace(new RegExp('{{.*?}}', 'g'), (match: string) => replaceTag(match, mediaTypeModel, ignoreUndefined));
 }
 
+/**
+ * After template rendering, remove any ## heading sections whose body content
+ * is empty (only whitespace, blank lines, or the literal string 'null').
+ * IMPORTANT: Only removes sections that originally contained {{variable}} placeholders.
+ * Sections without {{}} (user's own note sections) are always preserved.
+ */
+export function removeEmptyBodySections(rendered: string, originalTemplate: string): string {
+	// Build set of heading names that had {{variable}} in the original template
+	const headingsWithVars = new Set<string>();
+	for (const part of originalTemplate.split(/(?=^## )/m)) {
+		if (!part.startsWith('## ')) continue;
+		if (/\{\{.*?\}\}/.test(part)) {
+			const heading = part.split('\n')[0].replace(/^## /, '').trim().toLowerCase();
+			headingsWithVars.add(heading);
+		}
+	}
+
+	const parts = rendered.split(/(?=^## )/m);
+	const kept: string[] = [];
+
+	for (const part of parts) {
+		if (!part.startsWith('## ')) {
+			// Preamble — always keep
+			kept.push(part);
+			continue;
+		}
+
+		const heading = part.split('\n')[0].replace(/^## /, '').trim().toLowerCase();
+		const nlIdx = part.indexOf('\n');
+		const body = nlIdx !== -1 ? part.slice(nlIdx + 1) : '';
+
+		const bodyText = body
+			.replace(/^---$/gm, '')
+			.replace(/\bnull\b/g, '')
+			.trim();
+
+		if (bodyText.length > 0) {
+			// Has content — always keep
+			kept.push(part);
+		} else if (!headingsWithVars.has(heading)) {
+			// No {{variable}} in original template — user section, keep even if empty
+			kept.push(part);
+		}
+		// else: was a {{variable}} section with empty/null result — silently skip
+	}
+
+	return kept.join('');
+}
+
 function replaceTag(match: string, mediaTypeModel: MediaTypeModel, ignoreUndefined: boolean): string {
 	let tag = match;
 	tag = tag.substring(2);

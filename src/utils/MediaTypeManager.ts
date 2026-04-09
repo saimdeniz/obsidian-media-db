@@ -15,7 +15,7 @@ import { WikiModel } from '../models/WikiModel';
 import type { MediaDbPluginSettings } from '../settings/Settings';
 import { ILLEGAL_FILENAME_CHARACTERS } from './IllegalFilenameCharactersList';
 import { MediaType } from './MediaType';
-import { replaceIllegalFileNameCharactersInString, replaceTags } from './Utils';
+import { replaceIllegalFileNameCharactersInString, replaceTags, removeEmptyBodySections } from './Utils';
 
 // All media types in alphabetical order
 export const MEDIA_TYPES: MediaType[] = [
@@ -135,7 +135,9 @@ export class MediaTypeManager {
 
 		const template = await app.vault.cachedRead(templateFile as TFile);
 		// console.log(template);
-		return replaceTags(template, mediaTypeModel);
+		const rendered = replaceTags(template, mediaTypeModel);
+		// Pass original template so user sections (without {{}}) are never removed
+		return removeEmptyBodySections(rendered, template);
 	}
 
 	async getFolder(mediaTypeModel: MediaTypeModel, app: App): Promise<TFolder> {

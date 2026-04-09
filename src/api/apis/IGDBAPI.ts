@@ -36,6 +36,7 @@ interface IGDBGame {
 	cover?: IGDBCover;
 	first_release_date?: number;
 	summary?: string;
+	storyline?: string;
 	total_rating?: number;
 	url?: string;
 	genres?: IGDBGenre[];
@@ -120,7 +121,7 @@ export class IGDBAPI extends APIModel {
 		console.log(`MDB | api "${this.apiName}" queried by ID`);
 		const token = await this.getAuthToken();
 		const clientId = getApiSecretValue(this.plugin.app, this.plugin.settings.linkedApiSecretIds, ApiSecretID.igdbClientId);
-		const queryBody = `fields name, cover.url, first_release_date, summary, total_rating, url, genres.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, platforms.name, game_modes.name, collection.name, collections.name, franchises.name; where id = ${id};`;
+		const queryBody = `fields name, cover.url, first_release_date, summary, storyline, total_rating, url, genres.name, involved_companies.company.name, involved_companies.developer, involved_companies.publisher, platforms.name, game_modes.name, collection.name, collections.name, franchises.name; where id = ${id};`;
 		const response = await requestUrl({
 			url: `${this.apiUrl}/games`,
 			method: 'POST',
@@ -165,6 +166,7 @@ export class IGDBAPI extends APIModel {
 			url: result.url,
 			id: result.id.toString(),
 			summary: result.summary ?? '',
+			storyline: result.storyline ?? '',
 			series: combinedSeries,
 			gameModes: result.game_modes?.map(g => g.name) || [],
 			platforms: result.platforms?.map(p => p.name) || [],

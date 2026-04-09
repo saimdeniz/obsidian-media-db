@@ -12,6 +12,7 @@ export class GameModel extends MediaTypeModel {
 	onlineRating: number;
 	image: string;
 	summary: string;
+	storyline: string;
 	series: string[];
 	gameModes: string[];
 	platforms: string[];
@@ -33,6 +34,7 @@ export class GameModel extends MediaTypeModel {
 		this.onlineRating = 0;
 		this.image = '';
 		this.summary = '';
+		this.storyline = '';
 		this.series = [];
 		this.gameModes = [];
 		this.platforms = [];
