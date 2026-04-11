@@ -55,17 +55,29 @@ export class AutoTrackerHelper {
 		let failCount = 0;
 		const erroredFiles: { filePath: string; error: string }[] = [];
 
-		for (const file of filesToUpdate) {
-			try {
-				await this.plugin.updateNote(file, true, false, false, silent);
-				successCount++;
-			} catch (e) {
-				console.warn(`MDB Tracker | Failed to auto-update ${file.path}: `, e);
-				failCount++;
-				erroredFiles.push({ filePath: file.path, error: `${e}` });
+		let progress = silent ? null : new Notice('', 0);
+		let ai = 0;
+		try {
+			for (const file of filesToUpdate) {
+				// @ts-ignore
+				if (progress && progress.noticeEl && !document.body.contains(progress.noticeEl)) progress = new Notice('', 0);
+
+				const pct = Math.round((ai / (filesToUpdate.length || 1)) * 100);
+				progress?.setMessage(`MDB Tracker | ${ai + 1}/${filesToUpdate.length} (${pct}%) — ${file.basename}`);
+				try {
+					await this.plugin.updateNote(file, true, false, false, silent);
+					successCount++;
+				} catch (e) {
+					console.warn(`MDB Tracker | Failed to auto-update ${file.path}: `, e);
+					failCount++;
+					erroredFiles.push({ filePath: file.path, error: `${e}` });
+				}
+				// Sleep longer (1s) to be completely safe during background checks
+				await new Promise(resolve => setTimeout(resolve, 1000));
+				ai++;
 			}
-			// Sleep longer (1s) to be completely safe during background checks
-			await new Promise(resolve => setTimeout(resolve, 1000));
+		} finally {
+			progress?.hide();
 		}
 
 		if (failCount > 0 && erroredFiles.length > 0) {

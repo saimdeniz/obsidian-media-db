@@ -54,6 +54,8 @@ export interface MediaDbPluginSettings {
 	imageDownload: boolean;
 	imageFolder: string;
 	tmdbRegion: string;
+	tmdbPrimaryLanguage: string;
+	tmdbNativeFallbackLanguage: string;
 	enableAutoTagging: boolean;
 	autoTagEntities: string;
 	autoTagProperties: string;
@@ -378,6 +380,8 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	enableWikiLinkParsing: false,
 	autoUpdateAiringMode: false,
 	tmdbRegion: 'US',
+	tmdbPrimaryLanguage: 'en-US',
+	tmdbNativeFallbackLanguage: 'tr-TR',
 	addNormalizeTitlesAsAlias: false,
 	useObjectFormatForCurrencyValues: false,
 
@@ -798,6 +802,40 @@ export class MediaDbSettingTab extends PluginSettingTab {
 							.setValue(this.plugin.settings.tmdbRegion)
 							.onChange(async value => {
 								this.plugin.settings.tmdbRegion = value;
+								await this.plugin.saveSettings();
+							}),
+					),
+		);
+
+		panel.createDiv({ cls: 'media-db-plugin-spacer' });
+		panel.createEl('h3', { text: 'Language' });
+		const languageGroup = new SettingGroup(panel);
+		languageGroup.addSetting(
+			setting =>
+				void setting
+					.setName('Primary Language')
+					.setDesc('Primary language to fetch from TMDB (e.g. en-US)')
+					.addText(text =>
+						text
+							.setPlaceholder('en-US')
+							.setValue(this.plugin.settings.tmdbPrimaryLanguage)
+							.onChange(async value => {
+								this.plugin.settings.tmdbPrimaryLanguage = value;
+								await this.plugin.saveSettings();
+							}),
+					),
+		);
+		languageGroup.addSetting(
+			setting =>
+				void setting
+					.setName('Native Fallback Language')
+					.setDesc("If the media's original language matches this code (e.g. 'tr') and the plot is missing, fetch the plot in this language (e.g. 'tr-TR').")
+					.addText(text =>
+						text
+							.setPlaceholder('tr-TR')
+							.setValue(this.plugin.settings.tmdbNativeFallbackLanguage)
+							.onChange(async value => {
+								this.plugin.settings.tmdbNativeFallbackLanguage = value;
 								await this.plugin.saveSettings();
 							}),
 					),

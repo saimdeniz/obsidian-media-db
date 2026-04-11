@@ -42,44 +42,61 @@ export class BulkImportHelper {
 			}).open();
 		});
 
-		for (const child of folder.children) {
-			if (!(child instanceof TFile)) {
-				continue;
-			}
-
-			const file: TFile = child;
-			if (canceled) {
-				erroredFiles.push({ filePath: file.path, error: 'user canceled' });
-				continue;
-			}
-
-			const metadata = this.plugin.getMetadataFromFileCache(file);
-			const lookupValue = metadata[fieldName];
-
-			if (!lookupValue || typeof lookupValue !== 'string') {
-				erroredFiles.push({ filePath: file.path, error: `metadata field '${fieldName}' not found, empty, or not a string` });
-				continue;
-			} else if (lookupMethod === BulkImportLookupMethod.ID) {
-				const error = await this.importById(file, lookupValue, selectedAPI, appendContent);
-				if (error) {
-					erroredFiles.push(error);
-				} else {
-					successCount++;
+		const mdFiles = folder.children.filter((c): c is TFile => c instanceof TFile);
+		const fileCount = mdFiles.length || 1;
+		let progress = new Notice('', 0);
+		let i = 0;
+		try {
+			for (const child of folder.children) {
+				if (!(child instanceof TFile)) {
+					continue;
 				}
-			} else if (lookupMethod === BulkImportLookupMethod.TITLE) {
-				const error = await this.importByTitle(file, lookupValue, selectedAPI, appendContent);
-				if (error) {
-					if (error.canceled) {
-						canceled = true;
+
+				const file: TFile = child;
+				// @ts-ignore
+				if (progress.noticeEl && !document.body.contains(progress.noticeEl)) progress = new Notice('', 0);
+
+				const pct = Math.round((i / fileCount) * 100);
+				progress.setMessage(`MDB | Importing: ${i + 1}/${fileCount} (${pct}%) — ${file.basename}`);
+				if (canceled) {
+					erroredFiles.push({ filePath: file.path, error: 'user canceled' });
+					i++;
+					continue;
+				}
+
+				const metadata = this.plugin.getMetadataFromFileCache(file);
+				const lookupValue = metadata[fieldName];
+
+				if (!lookupValue || typeof lookupValue !== 'string') {
+					erroredFiles.push({ filePath: file.path, error: `metadata field '${fieldName}' not found, empty, or not a string` });
+					i++;
+					continue;
+				} else if (lookupMethod === BulkImportLookupMethod.ID) {
+					const error = await this.importById(file, lookupValue, selectedAPI, appendContent);
+					if (error) {
+						erroredFiles.push(error);
+					} else {
+						successCount++;
 					}
-					erroredFiles.push(error);
+				} else if (lookupMethod === BulkImportLookupMethod.TITLE) {
+					const error = await this.importByTitle(file, lookupValue, selectedAPI, appendContent);
+					if (error) {
+						if (error.canceled) {
+							canceled = true;
+						}
+						erroredFiles.push(error);
+					} else {
+						successCount++;
+					}
 				} else {
-					successCount++;
+					erroredFiles.push({ filePath: file.path, error: `invalid lookup type` });
+					i++;
+					continue;
 				}
-			} else {
-				erroredFiles.push({ filePath: file.path, error: `invalid lookup type` });
-				continue;
+				i++;
 			}
+		} finally {
+			progress.hide();
 		}
 
 		if (erroredFiles.length > 0) {

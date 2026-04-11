@@ -67,6 +67,7 @@ export class TMDBMovieAPI extends APIModel {
 				query: {
 					query: encodeURIComponent(title),
 					include_adult: this.plugin.settings.sfwFilter ? false : true,
+					language: this.plugin.settings.tmdbPrimaryLanguage,
 				},
 			},
 			fetch: fetch,
@@ -126,6 +127,7 @@ export class TMDBMovieAPI extends APIModel {
 				path: { movie_id: parseInt(id) },
 				query: {
 					append_to_response: 'credits,release_dates,watch/providers',
+					language: this.plugin.settings.tmdbPrimaryLanguage,
 				},
 			},
 			fetch: fetch,
@@ -138,11 +140,36 @@ export class TMDBMovieAPI extends APIModel {
 			throw Error(`MDB | Received status code ${response.response.status} from ${this.apiName}.`);
 		}
 
-		const result = response.data;
+		let result = response.data;
 
 		if (!result) {
 			throw Error(`MDB | No data received from ${this.apiName}.`);
 		}
+		
+		const fallbackLang = this.plugin.settings.tmdbNativeFallbackLanguage;
+		// @ts-ignore
+		if (!result.overview && fallbackLang && result.original_language && result.original_language.toLowerCase() === fallbackLang.split('-')[0].toLowerCase()) {
+			const fallbackResponse = await client.GET('/3/movie/{movie_id}', {
+				headers: {
+					Authorization: `Bearer ${bearer}`,
+				},
+				params: {
+					path: { movie_id: parseInt(id) },
+					query: {
+						append_to_response: 'credits,release_dates,watch/providers',
+						language: fallbackLang,
+					},
+				},
+				fetch: fetch,
+			});
+			if (fallbackResponse.response.status === 200 && fallbackResponse.data) {
+				const fallbackData = fallbackResponse.data;
+				if (fallbackData.overview) result.overview = fallbackData.overview;
+				// @ts-ignore
+				if (!result.tagline && fallbackData.tagline) result.tagline = fallbackData.tagline;
+			}
+		}
+
 		// console.debug(result);
 
 		return new MovieModel({
@@ -171,7 +198,11 @@ export class TMDBMovieAPI extends APIModel {
 
 			released: ['Released'].includes(result.status!),
 			country: result.production_countries?.map((c: any) => c.name) ?? [],
-			language: result.spoken_languages?.map((l: any) => l.english_name) ?? [],
+			language: result.original_language && result.spoken_languages && result.spoken_languages.length > 0 
+				// @ts-ignore
+				? [result.spoken_languages.find((l: any) => l.iso_639_1 === result.original_language)?.english_name || result.spoken_languages[0].english_name]
+				// @ts-ignore
+				: result.spoken_languages?.map((l: any) => l.english_name) ?? [],
 			budget: formatUsdWholeDollars(result.budget ?? 0),
 			revenue: formatUsdWholeDollars(result.revenue ?? 0),
 			// @ts-ignore

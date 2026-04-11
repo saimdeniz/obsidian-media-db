@@ -35,16 +35,28 @@ export class BulkRecreateHelper {
 			let failCount = 0;
 			const erroredFiles: { filePath: string; error: string }[] = [];
 
-			for (const file of mediaFiles) {
-				try {
-					await this.plugin.updateNote(file, onlyMetadata, false, false, silent);
-					successCount++;
-				} catch (e) {
-					console.error(`MDB | Failed to bulk recreate ${file.path}: `, e);
-					failCount++;
-					erroredFiles.push({ filePath: file.path, error: `${e}` });
+			let progress = new Notice('', 0);
+			let i = 0;
+			try {
+				for (const file of mediaFiles) {
+					// @ts-ignore (Recreate notice if user accidentally clicked/closed it)
+					if (progress.noticeEl && !document.body.contains(progress.noticeEl)) progress = new Notice('', 0);
+					
+					const pct = Math.round((i / mediaFiles.length) * 100);
+					progress.setMessage(`MDB | Recreating: ${i + 1}/${mediaFiles.length} (${pct}%) — ${file.basename}`);
+					try {
+						await this.plugin.updateNote(file, onlyMetadata, false, false, silent);
+						successCount++;
+					} catch (e) {
+						console.error(`MDB | Failed to bulk recreate ${file.path}: `, e);
+						failCount++;
+						erroredFiles.push({ filePath: file.path, error: `${e}` });
+					}
+					await new Promise(resolve => setTimeout(resolve, 800));
+					i++;
 				}
-				await new Promise(resolve => setTimeout(resolve, 800));
+			} finally {
+				progress.hide();
 			}
 
 			if (failCount > 0 && erroredFiles.length > 0) {

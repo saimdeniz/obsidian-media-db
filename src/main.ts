@@ -963,18 +963,30 @@ export default class MediaDbPlugin extends Plugin {
 		let failed = 0;
 		const erroredFiles: { filePath: string; error: string }[] = [];
 
-		for (const file of files) {
-			const result = await this.downloadImagesInFile(file, true);
-			if (result.success) {
-				downloaded++;
-			} else if (!result.skipped) {
-				failed++;
-				if (result.error) erroredFiles.push({ filePath: file.path, error: result.error });
+		let progress = new Notice('', 0);
+		let pi = 0;
+		try {
+			for (const file of files) {
+				// @ts-ignore
+				if (progress.noticeEl && !document.body.contains(progress.noticeEl)) progress = new Notice('', 0);
+
+				const pct = Math.round((pi / (files.length || 1)) * 100);
+				progress.setMessage(`MDB | Downloading: ${pi + 1}/${files.length} (${pct}%) — ${file.basename}`);
+				const result = await this.downloadImagesInFile(file, true);
+				if (result.success) {
+					downloaded++;
+				} else if (!result.skipped) {
+					failed++;
+					if (result.error) erroredFiles.push({ filePath: file.path, error: result.error });
+				}
+				// wait slightly as anti-rate limit
+				if (!result.skipped) {
+					await new Promise(r => setTimeout(r, 600));
+				}
+				pi++;
 			}
-			// wait slightly as anti-rate limit
-			if (!result.skipped) {
-				await new Promise(r => setTimeout(r, 600));
-			}
+		} finally {
+			progress.hide();
 		}
 
 		if (failed > 0 && erroredFiles.length > 0) {
