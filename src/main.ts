@@ -1146,9 +1146,19 @@ export default class MediaDbPlugin extends Plugin {
 			const isEnabled = this.settings.enableWikiLinkParsing;
 			const formatWiki = (v: unknown) => {
 				if (typeof v !== 'string') return v;
+				const isAlreadyWiki = v.startsWith('[[') && v.endsWith(']]');
 				let clean = v.replace(/^\[\[(.*?)\]\]$/, '$1');
-				if (clean.includes('|')) clean = clean.split('|')[1];
-				return isEnabled ? `[[${folderPrefix}${clean}|${clean}]]` : clean.trim();
+				
+				if (isAlreadyWiki && clean.includes('|')) {
+					clean = clean.split('|')[1];
+				}
+
+				if (!isEnabled) {
+					return clean.trim();
+				}
+
+				const safeFilePath = clean.trim().replace(/[\\/:"*?<>|]/g, '-');
+				return `[[${folderPrefix}${safeFilePath}]]`;
 			};
 
 			for (const [key, value] of Object.entries(fileMetadata)) {
