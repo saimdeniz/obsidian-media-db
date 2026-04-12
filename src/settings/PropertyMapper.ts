@@ -3,7 +3,7 @@ import { ArtistModel } from '../models/ArtistModel';
 import { MusicReleaseModel } from '../models/MusicReleaseModel';
 import { MediaType } from '../utils/MediaType';
 import { noteTypeValueForMedia, resolveMetadataTypeToMediaType } from '../utils/noteTypeSettings';
-import { coerceYear } from '../utils/Utils';
+import { coerceYear, replaceIllegalFileNameCharactersInString } from '../utils/Utils';
 import { PropertyMappingOption } from './PropertyMapping';
 
 export class PropertyMapper {
@@ -55,14 +55,19 @@ export class PropertyMapper {
 
 				let finalValue = value;
 				if (propertyMapping.wikilink) {
+					const makeSafeWikiLink = (val: string) => {
+						const safePath = replaceIllegalFileNameCharactersInString(val);
+						return `[[${safePath}]]`;
+					};
+
 					if (typeof value === 'string') {
-						finalValue = `[[${value}]]`;
+						finalValue = makeSafeWikiLink(value);
 					} else if (Array.isArray(value)) {
 						finalValue = value.map((v: unknown) => {
 							if (typeof v !== 'string') {
 								return v;
 							}
-							return `[[${v}]]`;
+							return makeSafeWikiLink(v);
 						});
 					}
 				}
