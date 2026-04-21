@@ -1604,7 +1604,7 @@ export default class MediaDbPlugin extends Plugin {
 
 		let newMediaTypeModel = await this.apiManager.queryDetailedInfoById(validOldMetadata.id, validOldMetadata.dataSource, mediaType);
 		if (!newMediaTypeModel) {
-			return;
+			throw new Error(`No data returned for id "${validOldMetadata.id}" from "${validOldMetadata.dataSource}". The ID may be invalid or the source may be unavailable.`);
 		}
 
 		if (onlyMetadata) {

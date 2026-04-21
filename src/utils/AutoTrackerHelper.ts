@@ -55,7 +55,8 @@ export class AutoTrackerHelper {
 		let failCount = 0;
 		const erroredFiles: { filePath: string; error: string }[] = [];
 
-		let progress = silent ? null : new Notice('', 0);
+		// Always show progress Notice (like BulkRecreate) — silent only suppresses per-file individual notices
+		let progress = new Notice('', 0);
 		let ai = 0;
 		try {
 			for (const file of filesToUpdate) {

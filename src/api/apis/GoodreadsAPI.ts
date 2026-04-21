@@ -78,9 +78,15 @@ export class GoodreadsAPI extends APIModel {
 			return book;
 		}
 
-		// Fallback to Legacy HTML parsing
+		// Fallback to Legacy HTML (meta tags)
 		console.log(`MDB | GoodreadsAPI: __NEXT_DATA__ parsing failed for id ${id}, trying legacy fallback.`);
-		return this.parseLegacyHTML(html, id);
+		const legacyBook = this.parseLegacyHTML(html, id);
+		if (legacyBook && legacyBook.title !== 'Unknown Book') {
+			return legacyBook;
+		}
+
+		// Neither method found real data — the ID is likely invalid or the page is a "not found" page
+		throw new Error(`GoodreadsAPI: No book found for id "${id}". The ID may be invalid or the page is unavailable.`);
 	}
 
 	async searchByISBN(isbn: string): Promise<MediaTypeModel[]> {
