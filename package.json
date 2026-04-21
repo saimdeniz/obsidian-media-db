@@ -5,7 +5,7 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "vite build --watch --mode development",
-		"build": "bun run tsc && vite build --mode production",
+		"build": "npm run tsc && vite build --mode production && node -e \"require('fs').copyFileSync('dist/main.js', 'main.js'); require('fs').copyFileSync('dist/styles.css', 'styles.css')\"",
 		"tsc": "tsc -noEmit -skipLibCheck",
 		"test": "npm test",
 		"test:log": "LOG_TESTS=true npm test",
