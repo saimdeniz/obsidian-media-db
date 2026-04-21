@@ -16,6 +16,10 @@ export abstract class APIModel {
 	 */
 	abstract searchByTitle(title: string): Promise<MediaTypeModel[]>;
 
+	async searchByISBN(isbn: string): Promise<MediaTypeModel[]> {
+		return [];
+	}
+
 	abstract getById(id: string): Promise<MediaTypeModel>;
 
 	abstract getDisabledMediaTypes(): MediaType[];

@@ -162,7 +162,20 @@ export class TMDBSeriesAPI extends APIModel {
 			writer: result.created_by?.map((c: any) => c.name) ?? [],
 			studio: result.production_companies?.map((s: any) => s.name) ?? [],
 			episodes: result.number_of_episodes,
-			duration: result.episode_run_time?.[0]?.toString() ?? 'unknown',
+			duration: (() => {
+				if (result.episode_run_time && result.episode_run_time.length > 0) {
+					// TMDB sometimes returns multiple typical runtimes (e.g. [45, 60]). Take the average.
+					const sum = result.episode_run_time.reduce((acc: number, val: number) => acc + val, 0);
+					return Math.round(sum / result.episode_run_time.length).toString();
+				}
+				// @ts-ignore
+				if (result.last_episode_to_air && result.last_episode_to_air.runtime) {
+					// Fallback for newer series where TMDB deprecated the main array
+					// @ts-ignore
+					return result.last_episode_to_air.runtime.toString();
+				}
+				return 'unknown';
+			})(),
 			onlineRating: result.vote_average ? Math.round(result.vote_average * 10) / 10 : 0,
 			// TMDB's spec allows for 'append_to_response' but doesn't seem to account for it in the type
 			// @ts-ignore

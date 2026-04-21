@@ -1,5 +1,10 @@
 import { MarkdownView, Notice, parseYaml, Plugin, stringifyYaml, TFolder, TFile } from 'obsidian';
 import { requestUrl, normalizePath } from 'obsidian';
+import { MediaDbIsbnSearchModal } from './modals/MediaDbIsbnSearchModal';
+import { GoogleBooksAPI } from './api/apis/GoogleBooksAPI';
+import { GoodreadsAPI } from './api/apis/GoodreadsAPI';
+import { MetadataAggregator } from './api/helpers/MetadataAggregator';
+import { BookModel } from './models/BookModel';
 import { MediaType } from 'src/utils/MediaType';
 import { APIManager } from './api/APIManager';
 import { BoardGameGeekAPI } from './api/apis/BoardGameGeekAPI';
@@ -43,7 +48,8 @@ import { BulkImportHelper } from './utils/BulkImportHelper';
 import { BulkUpdateHelper } from './utils/BulkUpdateHelper';
 import { BulkRecreateHelper } from './utils/BulkRecreateHelper';
 import { DateFormatter } from './utils/DateFormatter';
-import { MEDIA_TYPES, MediaTypeManager } from './utils/MediaTypeManager';
+import { MediaTypeManager } from './utils/MediaTypeManager';
+import { MEDIA_TYPES } from './utils/MediaType';
 import type { SearchModalOptions } from './utils/ModalHelper';
 import { ModalHelper } from './utils/ModalHelper';
 import { noteTypeValueForMedia, resolveMetadataTypeToMediaType } from './utils/noteTypeSettings';
@@ -61,6 +67,7 @@ export interface MediaTypeModelObj {
 
 export default class MediaDbPlugin extends Plugin {
 	settings!: MediaDbPluginSettings;
+	metadataAggregator!: MetadataAggregator;
 	apiManager!: APIManager;
 	mediaTypeManager!: MediaTypeManager;
 	modelPropertyMapper!: PropertyMapper;
@@ -94,6 +101,8 @@ export default class MediaDbPlugin extends Plugin {
 		this.apiManager.registerAPI(new IGDBAPI(this));
 		this.apiManager.registerAPI(new RAWGAPI(this));
 		this.apiManager.registerAPI(new VNDBAPI(this));
+		this.apiManager.registerAPI(new GoogleBooksAPI(this));
+		this.apiManager.registerAPI(new GoodreadsAPI(this));
 
 		this.mediaTypeManager = new MediaTypeManager();
 		this.modelPropertyMapper = new PropertyMapper(this);
@@ -105,6 +114,10 @@ export default class MediaDbPlugin extends Plugin {
 		this.dateFormatter = new DateFormatter();
 
 		await this.loadSettings();
+
+		// Init after settings are loaded so MetadataAggregator has correct settings references
+		this.metadataAggregator = new MetadataAggregator(this.apiManager, this.settings);
+
 		// register the settings tab
 		this.addSettingTab(new MediaDbSettingTab(this.app, this));
 
@@ -260,6 +273,11 @@ export default class MediaDbPlugin extends Plugin {
 			id: 'open-media-db-advanced-search-modal',
 			name: 'Create Media DB entry (advanced search)',
 			callback: () => this.createEntryWithAdvancedSearchModal(),
+		});
+		this.addCommand({
+			id: 'open-media-db-isbn-search-modal',
+			name: 'Create Media DB entry by ISBN',
+			callback: () => this.createEntryWithIsbnSearchModal(),
 		});
 		// register command to open id search modal
 		this.addCommand({
@@ -550,6 +568,53 @@ export default class MediaDbPlugin extends Plugin {
 		await this.createMediaDbNotes(selectResults!);
 	}
 
+	async createEntryWithIsbnSearchModal(): Promise<void> {
+		const isbn = await new Promise<string | undefined>(resolve => {
+			const modal = new MediaDbIsbnSearchModal(this, val => resolve(val));
+			modal.onClose = () => resolve(undefined);
+			modal.open();
+		});
+
+		if (!isbn) return;
+
+		new Notice(`Searching for ISBN: ${isbn}...`);
+
+		const apis = ['GoodreadsAPI', 'GoogleBooksAPI'];
+		const results = await this.apiManager.queryByIsbn(isbn, apis);
+
+		if (results.length === 0) {
+			new Notice('No results found for this ISBN.');
+			return;
+		}
+
+		let selected: MediaTypeModel;
+
+		if (results.length === 1) {
+			selected = results[0];
+		} else {
+			// Show selection modal if multiple APIs returned results
+			const selectResults = await this.modalHelper.openSelectModal(
+				{ elements: results, multiSelect: false, description: 'Multiple sources found for this ISBN. Select one:' },
+				async data => data.selected
+			);
+
+			if (!selectResults || selectResults.length === 0) return;
+			selected = selectResults[0];
+		}
+
+		// Query full details if needed (ISBN search might already return partial model)
+		const detailed = await this.apiManager.queryDetailedInfo(selected);
+		if (!detailed) {
+			new Notice('Failed to fetch full details for the selected book.');
+			return;
+		}
+
+		const confirmed = await this.modalHelper.openPreviewModal({ elements: [detailed] }, async data => data.confirmed);
+		if (confirmed) {
+			await this.createMediaDbNoteFromModel(detailed, { attachTemplate: true, openNote: true });
+		}
+	}
+
 	async createEntryWithIdSearchModal(): Promise<void> {
 		let idSearchResult: MediaTypeModel | undefined = undefined;
 		let proceed: boolean = false;
@@ -611,6 +676,10 @@ export default class MediaDbPlugin extends Plugin {
 	}
 
 	async createMediaDbNoteFromModel(mediaTypeModel: MediaTypeModel, options: CreateNoteOptions): Promise<void> {
+		if (mediaTypeModel.getMediaType() === MediaType.Book && mediaTypeModel instanceof BookModel) {
+			mediaTypeModel = await this.metadataAggregator.hydrateBook(mediaTypeModel);
+		}
+
 		if (mediaTypeModel.getMediaType() === MediaType.Artist) {
 			await this.importArtistDiscography(mediaTypeModel as ArtistModel, options);
 			return;
@@ -1538,12 +1607,12 @@ export default class MediaDbPlugin extends Plugin {
 			return;
 		}
 
-		newMediaTypeModel = Object.assign(oldMediaTypeModel, newMediaTypeModel.getWithOutUserData());
-		console.debug(`MDB | newMediaTypeModel after merge`, newMediaTypeModel);
-
 		if (onlyMetadata) {
+			// Safe mode: preserve old userData by merging old model with fresh API data
+			newMediaTypeModel = Object.assign(oldMediaTypeModel, newMediaTypeModel.getWithOutUserData());
 			await this.createMediaDbNoteFromModel(newMediaTypeModel, { attachFile: activeFile, folder: activeFile.parent ?? undefined, openNote: openNoteFinal, overwrite, preservePropertyOrder: preserveOrder });
 		} else {
+			// Reset mode: use fresh API data with default userData (no merge — userData is intentionally cleared)
 			await this.createMediaDbNoteFromModel(newMediaTypeModel, { attachTemplate: true, folder: activeFile.parent ?? undefined, openNote: openNoteFinal, overwrite });
 		}
 	}

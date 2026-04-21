@@ -14,23 +14,8 @@ import { SongModel } from '../models/SongModel';
 import { WikiModel } from '../models/WikiModel';
 import type { MediaDbPluginSettings } from '../settings/Settings';
 import { ILLEGAL_FILENAME_CHARACTERS } from './IllegalFilenameCharactersList';
-import { MediaType } from './MediaType';
+import { MediaType, MEDIA_TYPES } from './MediaType';
 import { replaceIllegalFileNameCharactersInString, replaceTags, removeEmptyBodySections } from './Utils';
-
-// All media types in alphabetical order
-export const MEDIA_TYPES: MediaType[] = [
-	MediaType.Artist,
-	MediaType.BoardGame,
-	MediaType.Book,
-	MediaType.ComicManga,
-	MediaType.Game,
-	MediaType.Movie,
-	MediaType.MusicRelease,
-	MediaType.Series,
-	MediaType.Season,
-	MediaType.Song,
-	MediaType.Wiki,
-];
 
 export class MediaTypeManager {
 	mediaFileNameTemplateMap: Map<MediaType, string>;

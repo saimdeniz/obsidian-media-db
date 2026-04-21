@@ -262,7 +262,18 @@ export class TMDBSeasonAPI extends APIModel {
 			genres: seriesData.genres?.map(g => g.name ?? '').filter(name => name !== '') ?? [],
 			writer: seriesData.created_by?.map(c => c.name ?? '').filter(name => name !== '') ?? [],
 			studio: seriesData.production_companies?.map(s => s.name ?? '').filter(name => name !== '') ?? [],
-			duration: seriesData.episode_run_time?.[0]?.toString() ?? '',
+			duration: (() => {
+				if (seriesData.episode_run_time && seriesData.episode_run_time.length > 0) {
+					const sum = seriesData.episode_run_time.reduce((acc: number, val: number) => acc + val, 0);
+					return Math.round(sum / seriesData.episode_run_time.length).toString();
+				}
+				// @ts-ignore
+				if (seriesData.last_episode_to_air && seriesData.last_episode_to_air.runtime) {
+					// @ts-ignore
+					return seriesData.last_episode_to_air.runtime.toString();
+				}
+				return '';
+			})(),
 			onlineRating: seasonData.vote_average ?? 0,
 			// @ts-ignore - append_to_response credits not reflected in base schema
 			actors: seriesData.credits?.cast?.map((c: any) => c.name).slice(0, 5) ?? [],

@@ -4,7 +4,7 @@ import { MediaType } from 'src/utils/MediaType';
 import type MediaDbPlugin from '../main';
 import { PropertyMappingModal } from '../modals/PropertyMappingModal';
 import type { MediaTypeModel } from '../models/MediaTypeModel';
-import { MEDIA_TYPES } from '../utils/MediaTypeManager';
+import { MEDIA_TYPES } from '../utils/MediaType';
 import { noteTypeValueForMedia, setNoteTypeForMedia } from '../utils/noteTypeSettings';
 import { fragWithHTML, mediaTypeDisplayName, unCamelCase } from '../utils/Utils';
 import { ApiSecretID } from './apiSecretsHelper';
@@ -38,6 +38,7 @@ function mediaTypeTabIcon(mediaType: MediaType): IconName {
 		case MediaType.Wiki:
 			return 'library-big';
 	}
+	return 'library' as IconName;
 }
 
 // MARK: Settings
@@ -82,6 +83,8 @@ export interface MediaDbPluginSettings {
 	TMDBSeriesAPI_disabledMediaTypes: MediaType[];
 	VNDBAPI_disabledMediaTypes: MediaType[];
 	WikipediaAPI_disabledMediaTypes: MediaType[];
+	GoogleBooksAPI_disabledMediaTypes: MediaType[];
+	GoodreadsAPI_disabledMediaTypes: MediaType[];
 
 	movieTemplate: string;
 	seriesTemplate: string;
@@ -177,6 +180,7 @@ class MediaTypeMappedSettings {
 			case MediaType.Wiki:
 				return settings.wikiTemplate;
 		}
+		return '';
 	}
 
 	setTemplate(settings: MediaDbPluginSettings, template: string): void {
@@ -242,6 +246,7 @@ class MediaTypeMappedSettings {
 			case MediaType.Wiki:
 				return settings.wikiFileNameTemplate;
 		}
+		return '';
 	}
 
 	setFileNameTemplate(settings: MediaDbPluginSettings, template: string): void {
@@ -307,6 +312,7 @@ class MediaTypeMappedSettings {
 			case MediaType.Wiki:
 				return settings.wikiFolder;
 		}
+		return '';
 	}
 
 	setFolder(settings: MediaDbPluginSettings, folder: string): void {
@@ -403,6 +409,8 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	TMDBSeriesAPI_disabledMediaTypes: [],
 	VNDBAPI_disabledMediaTypes: [],
 	WikipediaAPI_disabledMediaTypes: [],
+	GoogleBooksAPI_disabledMediaTypes: [],
+	GoodreadsAPI_disabledMediaTypes: [],
 
 	movieTemplate: '',
 	seriesTemplate: '',
@@ -470,6 +478,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 		[ApiSecretID.genius]: '',
 		[ApiSecretID.spotifyClientId]: '',
 		[ApiSecretID.spotifyClientSecret]: '',
+		[ApiSecretID.googleBooks]: '',
 	},
 };
 
@@ -1166,6 +1175,12 @@ export class MediaDbSettingTab extends PluginSettingTab {
 				'Spotify Client Secret',
 				'Pair with Spotify Client ID for client-credentials access to search tracks during artist import.',
 				ApiSecretID.spotifyClientSecret,
+			);
+			this.addApiSecretSetting(
+				apiKeyGroup,
+				'Google Books API Key',
+				'Optional. Enter your Google Books API key for higher rate limits and detailed ISBN lookups.',
+				ApiSecretID.googleBooks,
 			);
 		});
 

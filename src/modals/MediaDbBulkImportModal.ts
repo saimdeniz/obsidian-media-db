@@ -6,14 +6,15 @@ import type MediaDbPlugin from '../main';
 
 export class MediaDbBulkImportModal extends Modal {
 	plugin: MediaDbPlugin;
-	onSubmit: (selectedAPI: string, lookupMethod: BulkImportLookupMethod, fieldName: string, appendContent: boolean) => void;
+	onSubmit: (selectedAPI: string, lookupMethod: BulkImportLookupMethod, fieldName: string, appendContent: boolean, silentImport: boolean) => void;
 	selectedApi: string;
 	searchBtn?: ButtonComponent;
 	lookupMethod: BulkImportLookupMethod;
 	fieldName: string;
 	appendContent: boolean;
+	silentImport: boolean;
 
-	constructor(plugin: MediaDbPlugin, onSubmit: (selectedAPI: string, lookupMethod: BulkImportLookupMethod, fieldName: string, appendContent: boolean) => void) {
+	constructor(plugin: MediaDbPlugin, onSubmit: (selectedAPI: string, lookupMethod: BulkImportLookupMethod, fieldName: string, appendContent: boolean, silentImport: boolean) => void) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.onSubmit = onSubmit;
@@ -21,10 +22,11 @@ export class MediaDbBulkImportModal extends Modal {
 		this.lookupMethod = BulkImportLookupMethod.TITLE;
 		this.fieldName = '';
 		this.appendContent = false;
+		this.silentImport = false;
 	}
 
 	submit(): void {
-		this.onSubmit(this.selectedApi, this.lookupMethod, this.fieldName, this.appendContent);
+		this.onSubmit(this.selectedApi, this.lookupMethod, this.fieldName, this.appendContent, this.silentImport);
 		this.close();
 	}
 
@@ -64,7 +66,7 @@ export class MediaDbBulkImportModal extends Modal {
 		contentEl.createDiv({ cls: 'media-db-plugin-spacer' });
 		contentEl.createEl('h3', { text: 'Media lookup method' });
 		contentEl.createEl('p', {
-			text: 'Choose whether to search the API by title (can return multiple results) or lookup directly using an ID (returns at most one result), and specify the name of the frontmatter property which contains the title or ID of the media.',
+			text: 'Choose whether to search the API by Title, ID, or ISBN, and specify the name of the frontmatter property which contains that information.',
 		});
 
 		this.createDropdownEl(
@@ -76,6 +78,7 @@ export class MediaDbBulkImportModal extends Modal {
 			[
 				{ value: BulkImportLookupMethod.TITLE, display: 'Title' },
 				{ value: BulkImportLookupMethod.ID, display: 'ID' },
+				{ value: BulkImportLookupMethod.ISBN, display: 'ISBN' },
 			],
 		);
 
@@ -86,7 +89,7 @@ export class MediaDbBulkImportModal extends Modal {
 		fieldNameLabelWrapperEl.createEl('span', { text: 'Using the property named', cls: 'media-db-plugin-list-text' });
 
 		const fieldNameComponent = new TextComponent(fieldNameWrapperEl);
-		fieldNameComponent.setPlaceholder('title / id');
+		fieldNameComponent.setPlaceholder('title / id / isbn');
 		fieldNameComponent.onChange(value => (this.fieldName = value));
 		fieldNameComponent.inputEl.addEventListener('keydown', ke => {
 			if (ke.key === 'Enter') {
@@ -94,6 +97,16 @@ export class MediaDbBulkImportModal extends Modal {
 			}
 		});
 		contentEl.appendChild(fieldNameWrapperEl);
+
+		contentEl.createDiv({ cls: 'media-db-plugin-spacer' });
+
+		new Setting(contentEl)
+			.setName('Import Silently (No Confirmations)')
+			.setDesc('If enabled, the first result found for each file will be imported automatically without asking for individual confirmation.')
+			.addToggle(toggle => {
+				toggle.setValue(false);
+				toggle.onChange(value => (this.silentImport = value));
+			});
 
 		contentEl.createDiv({ cls: 'media-db-plugin-spacer' });
 

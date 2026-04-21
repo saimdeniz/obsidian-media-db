@@ -1,6 +1,6 @@
 import type { MediaDbPluginSettings } from '../settings/Settings';
 import { MediaType } from './MediaType';
-import { MEDIA_TYPES } from './MediaTypeManager';
+import { MEDIA_TYPES } from './MediaType';
 
 const MEDIA_TYPE_TO_NOTE_TYPE_KEY: Record<MediaType, keyof MediaDbPluginSettings> = {
 	[MediaType.Artist]: 'artistNoteType',

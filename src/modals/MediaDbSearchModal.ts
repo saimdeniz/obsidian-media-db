@@ -2,7 +2,7 @@ import type { ButtonComponent } from 'obsidian';
 import { Modal, Notice, Setting, TextComponent, ToggleComponent } from 'obsidian';
 import type MediaDbPlugin from '../main';
 import type { MediaType } from '../utils/MediaType';
-import { MEDIA_TYPES } from '../utils/MediaTypeManager';
+import { MEDIA_TYPES } from '../utils/MediaType';
 import type { SearchModalData, SearchModalOptions } from '../utils/ModalHelper';
 import { SEARCH_MODAL_DEFAULT_OPTIONS } from '../utils/ModalHelper';
 import { mediaTypeDisplayName } from '../utils/Utils';

@@ -36,6 +36,34 @@ export class APIManager {
 	}
 
 	/**
+	 * Queries the basic info for one ISBN and multiple APIs.
+	 *
+	 * @param isbn
+	 * @param apisToQuery
+	 */
+	async queryByIsbn(isbn: string, apisToQuery: string[]): Promise<MediaTypeModel[]> {
+		console.debug(`MDB | api manager queried by ISBN "${isbn}"`);
+
+		const promises = this.apis
+			.filter(api => apisToQuery.contains(api.apiName))
+			.map(async api => {
+				try {
+					if (typeof api.searchByISBN === 'function') {
+						return await api.searchByISBN(isbn);
+					}
+					return [];
+				} catch (e) {
+					new Notice(`Error querying ${api.apiName}: ${e}`);
+					console.warn(e);
+
+					return [];
+				}
+			});
+
+		return (await Promise.all(promises)).flat();
+	}
+
+	/**
 	 * Queries detailed information for a MediaTypeModel.
 	 *
 	 * @param item

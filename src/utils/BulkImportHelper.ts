@@ -1,5 +1,4 @@
-import type { TFolder } from 'obsidian';
-import { TFile } from 'obsidian';
+import { Notice, TFile, TFolder } from 'obsidian';
 import type MediaDbPlugin from 'src/main';
 import { CompletionModal } from 'src/modals/CompletionModal';
 import { MediaDbBulkImportModal as MediaDbBulkImportModal } from 'src/modals/MediaDbBulkImportModal';
@@ -10,6 +9,7 @@ import { dateTimeToString, markdownTable } from './Utils';
 export enum BulkImportLookupMethod {
 	ID = 'id',
 	TITLE = 'title',
+	ISBN = 'isbn',
 }
 
 interface BulkImportError {
@@ -31,14 +31,15 @@ export class BulkImportHelper {
 		let successCount = 0;
 		const startTime = Date.now();
 
-		const { selectedAPI, lookupMethod, fieldName, appendContent } = await new Promise<{
+		const { selectedAPI, lookupMethod, fieldName, appendContent, silentImport } = await new Promise<{
 			selectedAPI: string;
 			lookupMethod: BulkImportLookupMethod;
 			fieldName: string;
 			appendContent: boolean;
+			silentImport: boolean;
 		}>(resolve => {
-			new MediaDbBulkImportModal(this.plugin, (selectedAPI: string, lookupMethod: BulkImportLookupMethod, fieldName: string, appendContent: boolean) => {
-				resolve({ selectedAPI, lookupMethod, fieldName, appendContent });
+			new MediaDbBulkImportModal(this.plugin, (selectedAPI: string, lookupMethod: BulkImportLookupMethod, fieldName: string, appendContent: boolean, silentImport: boolean) => {
+				resolve({ selectedAPI, lookupMethod, fieldName, appendContent, silentImport });
 			}).open();
 		});
 
@@ -79,7 +80,18 @@ export class BulkImportHelper {
 						successCount++;
 					}
 				} else if (lookupMethod === BulkImportLookupMethod.TITLE) {
-					const error = await this.importByTitle(file, lookupValue, selectedAPI, appendContent);
+					const error = await this.importByTitle(file, lookupValue, selectedAPI, appendContent, silentImport);
+					if (error) {
+						if (error.canceled) {
+							canceled = true;
+						}
+						erroredFiles.push(error);
+					} else {
+						successCount++;
+					}
+				} else if (lookupMethod === BulkImportLookupMethod.ISBN) {
+					const cleanedIsbn = lookupValue.replace(/[^0-9]/g, '');
+					const error = await this.importByIsbn(file, cleanedIsbn, selectedAPI, appendContent, silentImport);
 					if (error) {
 						if (error.canceled) {
 							canceled = true;
@@ -130,7 +142,27 @@ export class BulkImportHelper {
 		}
 	}
 
-	private async importByTitle(file: TFile, lookupValue: string, selectedAPI: string, appendContent: boolean): Promise<BulkImportError | undefined> {
+	private async importByIsbn(file: TFile, lookupValue: string, selectedAPI: string, appendContent: boolean, silent = false): Promise<BulkImportError | undefined> {
+		let results: MediaTypeModel[] = [];
+		try {
+			results = await this.plugin.apiManager.queryByIsbn(lookupValue, [selectedAPI]);
+		} catch (e) {
+			return { filePath: file.path, error: `${e}` };
+		}
+		if (!results || results.length === 0) {
+			return { filePath: file.path, error: `no search results for isbn` };
+		}
+
+		if (silent) {
+			return this.silentImport(file, results[0], appendContent);
+		}
+
+		// If exactly one highly specific result is returned (our Goodreads/Google logic often does this), 
+		// we could auto-confirm, but for safety in bulk, we reuse the selection logic.
+		return await this.showSelectionAndImport(file, results, lookupValue, appendContent);
+	}
+
+	private async importByTitle(file: TFile, lookupValue: string, selectedAPI: string, appendContent: boolean, silent = false): Promise<BulkImportError | undefined> {
 		let results: MediaTypeModel[] = [];
 		try {
 			results = await this.plugin.apiManager.query(lookupValue, [selectedAPI]);
@@ -141,6 +173,24 @@ export class BulkImportHelper {
 			return { filePath: file.path, error: `no search results` };
 		}
 
+		if (silent) {
+			return this.silentImport(file, results[0], appendContent);
+		}
+
+		return await this.showSelectionAndImport(file, results, lookupValue, appendContent);
+	}
+
+	private async silentImport(file: TFile, result: MediaTypeModel, appendContent: boolean): Promise<BulkImportError | undefined> {
+		try {
+			const detailedResults = await this.plugin.queryDetails([result]);
+			await this.plugin.createMediaDbNotes(detailedResults, appendContent ? file : undefined);
+			return undefined;
+		} catch (e) {
+			return { filePath: file.path, error: `Silent import error: ${e}` };
+		}
+	}
+
+	private async showSelectionAndImport(file: TFile, results: MediaTypeModel[], lookupValue: string, appendContent: boolean): Promise<BulkImportError | undefined> {
 		const { selectModalResult, selectModal } = await this.plugin.modalHelper.createSelectModal({
 			elements: results,
 			skipButton: true,
@@ -167,8 +217,13 @@ export class BulkImportHelper {
 			return { filePath: file.path, error: `no search results selected` };
 		}
 
-		const detailedResults = await this.plugin.queryDetails(selectModalResult.data.selected);
-		await this.plugin.createMediaDbNotes(detailedResults, appendContent ? file : undefined);
+		try {
+			const detailedResults = await this.plugin.queryDetails(selectModalResult.data.selected);
+			await this.plugin.createMediaDbNotes(detailedResults, appendContent ? file : undefined);
+		} catch (e) {
+			selectModal.close();
+			return { filePath: file.path, error: `Detaling/Creating error: ${e}` };
+		}
 
 		selectModal.close();
 		return undefined;
