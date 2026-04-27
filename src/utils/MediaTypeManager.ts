@@ -80,7 +80,8 @@ export class MediaTypeManager {
 	cleanFileName(fileName: string): string {
 		const cleanedFileName = ILLEGAL_FILENAME_CHARACTERS.reduce((str, char) => str.replaceAll(char[0], char[1]), fileName);
 		// Remove all duplicate whitespace in the file name
-		return cleanedFileName.replaceAll(/ +/g, ' ');
+		// Also strip leading dots so Obsidian does not treat the file as hidden (e.g. ".45 Parabellum" → "45 Parabellum")
+		return cleanedFileName.replaceAll(/ +/g, ' ').replace(/^\.+/, '').trim();
 	}
 
 	/** Expands {{ tags }} in a folder path and sanitizes each segment for vault paths. */
