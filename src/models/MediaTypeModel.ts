@@ -1,4 +1,5 @@
 import type { MediaType } from '../utils/MediaType';
+import { mediaDbTag } from '../utils/Utils';
 
 export abstract class MediaTypeModel {
 	type: string;
@@ -55,7 +56,7 @@ export abstract class MediaTypeModel {
 		if (hasSummary) obj.summary = summary || null;
 		if (hasPlot) obj.plot = plot || null;
 
-		obj.tags = this.getTags().join('/');
+		obj.tags = this.getTags().filter(t => t !== mediaDbTag).join('/');
 		return obj;
 	}
 
